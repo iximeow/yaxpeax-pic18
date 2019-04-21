@@ -1,3 +1,10 @@
+#[cfg(feature="use-serde")]
+#[macro_use] extern crate serde_derive;
+#[cfg(feature="use-serde")]
+extern crate serde;
+#[cfg(feature="use-serde")]
+use serde::{Serialize, Deserialize};
+
 extern crate yaxpeax_arch;
 
 use yaxpeax_arch::{Arch, Decodable, LengthedInstruction};
@@ -5,7 +12,14 @@ use yaxpeax_arch::{Arch, Decodable, LengthedInstruction};
 pub mod consts;
 pub mod display;
 
+#[cfg(feature="use-serde")]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PIC18;
+
+#[cfg(not(feature="use-serde"))]
+#[derive(Debug)]
+pub struct PIC18;
+
 impl Arch for PIC18 {
     type Address = u32;
     type Instruction = Instruction;
