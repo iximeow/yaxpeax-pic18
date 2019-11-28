@@ -7,7 +7,7 @@ extern crate serde;
 
 extern crate yaxpeax_arch;
 
-use yaxpeax_arch::{Arch, Decodable, LengthedInstruction};
+use yaxpeax_arch::{Arch, Decoder, LengthedInstruction};
 
 pub mod consts;
 pub mod display;
@@ -23,6 +23,7 @@ pub struct PIC18;
 impl Arch for PIC18 {
     type Address = u32;
     type Instruction = Instruction;
+    type Decoder = InstDecoder;
     type Operand = Operand;
 }
 
@@ -158,15 +159,18 @@ pub enum Operand {
     Nothing
 }
 
-impl Decodable for Instruction {
-    fn decode<T: IntoIterator<Item=u8>>(bytes: T) -> Option<Self> {
+#[derive(Default, Debug)]
+pub struct InstDecoder {}
+
+impl Decoder<Instruction> for InstDecoder {
+    fn decode<T: IntoIterator<Item=u8>>(&self, bytes: T) -> Option<Instruction> {
         let mut blank = Instruction::blank();
-        match blank.decode_into(bytes) {
+        match self.decode_into(&mut blank, bytes) {
             Some(_) => Some(blank),
             None => None
         }
     }
-    fn decode_into<T: IntoIterator<Item=u8>>(&mut self, bytes: T) -> Option<()> {
+    fn decode_into<T: IntoIterator<Item=u8>>(&self, inst: &mut Instruction, bytes: T) -> Option<()> {
         let mut bytes_iter = bytes.into_iter();
         let word: Vec<u8> = bytes_iter.by_ref().take(2).collect();
         if word.len() != 2 {
@@ -178,154 +182,154 @@ impl Decodable for Instruction {
             0x00 => {
                 match word[0] {
                     0x00 => {
-                        self.opcode = Opcode::NOP;
+                        inst.opcode = Opcode::NOP;
                         Some(())
                     },
                     0b00000011 => {
-                        self.opcode = Opcode::SLEEP;
+                        inst.opcode = Opcode::SLEEP;
                         Some(())
                     },
                     0b00000100 => {
-                        self.opcode = Opcode::CLRWDT;
+                        inst.opcode = Opcode::CLRWDT;
                         Some(())
                     },
                     0b00000101 => {
-                        self.opcode = Opcode::PUSH;
+                        inst.opcode = Opcode::PUSH;
                         Some(())
                     },
                     0b00000110 => {
-                        self.opcode = Opcode::POP;
+                        inst.opcode = Opcode::POP;
                         Some(())
                     },
                     0b00000111 => {
-                        self.opcode = Opcode::DAW;
+                        inst.opcode = Opcode::DAW;
                         Some(())
                     },
                     0b00001000 => {
-                        self.opcode = Opcode::TBLRD_S;
+                        inst.opcode = Opcode::TBLRD_S;
                         Some(())
                     },
                     0b00001001 => {
-                        self.opcode = Opcode::TBLRD_S_I;
+                        inst.opcode = Opcode::TBLRD_S_I;
                         Some(())
                     },
                     0b00001010 => {
-                        self.opcode = Opcode::TBLRD_S_D;
+                        inst.opcode = Opcode::TBLRD_S_D;
                         Some(())
                     },
                     0b00001011 => {
-                        self.opcode = Opcode::TBLRD_I_S;
+                        inst.opcode = Opcode::TBLRD_I_S;
                         Some(())
                     },
                     0b00001100 => {
-                        self.opcode = Opcode::TBLWT_S;
+                        inst.opcode = Opcode::TBLWT_S;
                         Some(())
                     },
                     0b00001101 => {
-                        self.opcode = Opcode::TBLWT_S_I;
+                        inst.opcode = Opcode::TBLWT_S_I;
                         Some(())
                     },
                     0b00001110 => {
-                        self.opcode = Opcode::TBLWT_S_D;
+                        inst.opcode = Opcode::TBLWT_S_D;
                         Some(())
                     },
                     0b00001111 => {
-                        self.opcode = Opcode::TBLWT_I_S;
+                        inst.opcode = Opcode::TBLWT_I_S;
                         Some(())
                     },
                     0b00010000 => {
-                        self.opcode = Opcode::RETFIE;
+                        inst.opcode = Opcode::RETFIE;
                         Some(())
                     },
                     0b00010001 => {
-                        self.opcode = Opcode::RETFIE_FAST;
+                        inst.opcode = Opcode::RETFIE_FAST;
                         Some(())
                     },
                     0b00010010 => {
-                        self.opcode = Opcode::RETURN;
+                        inst.opcode = Opcode::RETURN;
                         Some(())
                     },
                     0b00010011 => {
-                        self.opcode = Opcode::RETURN_FAST;
+                        inst.opcode = Opcode::RETURN_FAST;
                         Some(())
                     },
                     0b00010100 => {
-                        self.opcode = Opcode::CALLW;
+                        inst.opcode = Opcode::CALLW;
                         Some(())
                     },
                     0b11111111 => {
-                        self.opcode = Opcode::RESET;
+                        inst.opcode = Opcode::RESET;
                         Some(())
                     },
                     _ => {
-                        self.opcode = Opcode::Invalid(word[0], word[1]);
+                        inst.opcode = Opcode::Invalid(word[0], word[1]);
                         None
                     }
                 }
             },
             0x01 => {
-                self.opcode = Opcode::MOVLB;
+                inst.opcode = Opcode::MOVLB;
                 // this ignores high nibble of low word. ok by isa, but...
-                self.operands[0] = Operand::ImmediateU8(word[0] & 0x0f);
+                inst.operands[0] = Operand::ImmediateU8(word[0] & 0x0f);
                 Some(())
             },
             0x02 | 0x03 => {
-                self.opcode = Opcode::MULWF;
+                inst.opcode = Opcode::MULWF;
                 let a = (word[1] & 0x01) == 1;
-                self.operands[0] = Operand::File(word[0], a);
+                inst.operands[0] = Operand::File(word[0], a);
                 Some(())
             },
             0x04 | 0x05 | 0x06 | 0x07 => {
-                self.opcode = Opcode::DECF;
+                inst.opcode = Opcode::DECF;
                 let d = ((word[1] >> 1) & 0x01u8) == 1u8;
                 let a = (word[1] & 0x01) == 1;
-                self.operands[0] = Operand::RedirectableFile(word[0], a, d);
+                inst.operands[0] = Operand::RedirectableFile(word[0], a, d);
                 Some(())
             },
             0x08 => {
-                self.opcode = Opcode::SUBLW;
-                self.operands[0] = Operand::ImmediateU8(word[0]);
+                inst.opcode = Opcode::SUBLW;
+                inst.operands[0] = Operand::ImmediateU8(word[0]);
                 Some(())
             },
             0x09 => {
-                self.opcode = Opcode::IORLW;
-                self.operands[0] = Operand::ImmediateU8(word[0]);
+                inst.opcode = Opcode::IORLW;
+                inst.operands[0] = Operand::ImmediateU8(word[0]);
                 Some(())
             },
             0x0a => {
-                self.opcode = Opcode::XORLW;
-                self.operands[0] = Operand::ImmediateU8(word[0]);
+                inst.opcode = Opcode::XORLW;
+                inst.operands[0] = Operand::ImmediateU8(word[0]);
                 Some(())
             },
             0x0b => {
-                self.opcode = Opcode::ANDLW;
-                self.operands[0] = Operand::ImmediateU8(word[0]);
+                inst.opcode = Opcode::ANDLW;
+                inst.operands[0] = Operand::ImmediateU8(word[0]);
                 Some(())
             },
             0x0c => {
-                self.opcode = Opcode::RETLW;
-                self.operands[0] = Operand::ImmediateU8(word[0]);
+                inst.opcode = Opcode::RETLW;
+                inst.operands[0] = Operand::ImmediateU8(word[0]);
                 Some(())
             },
             0x0d => {
-                self.opcode = Opcode::MULLW;
-                self.operands[0] = Operand::ImmediateU8(word[0]);
+                inst.opcode = Opcode::MULLW;
+                inst.operands[0] = Operand::ImmediateU8(word[0]);
                 Some(())
             },
             0x0e => {
-                self.opcode = Opcode::MOVLW;
-                self.operands[0] = Operand::ImmediateU8(word[0]);
+                inst.opcode = Opcode::MOVLW;
+                inst.operands[0] = Operand::ImmediateU8(word[0]);
                 Some(())
             },
             0x0f => {
-                self.opcode = Opcode::ADDLW;
-                self.operands[0] = Operand::ImmediateU8(word[0]);
+                inst.opcode = Opcode::ADDLW;
+                inst.operands[0] = Operand::ImmediateU8(word[0]);
                 Some(())
             },
             x if x >= 0x10 && x < 0b01100000 => {
                 let da = x & 0b0011;
                 let opc = (x >> 2) - 4;
-                self.opcode = [
+                inst.opcode = [
                     Opcode::IORWF,
                     Opcode::ANDWF,
                     Opcode::XORWF,
@@ -347,13 +351,13 @@ impl Decodable for Instruction {
                     Opcode::SUBWFB,
                     Opcode::SUBWF
                 ][opc as usize];
-                self.operands[0] = Operand::RedirectableFile(word[0], (da & 0x01) == 0x01, (da & 0x02) == 0x02);
+                inst.operands[0] = Operand::RedirectableFile(word[0], (da & 0x01) == 0x01, (da & 0x02) == 0x02);
                 Some(())
             },
             x if x >= 0b01100000 && x < 0b01110000 => {
                 let a = x & 1;
                 let opc = (x >> 1) & 0b0000111;
-                self.opcode = [
+                inst.opcode = [
                     Opcode::CPFSLT,
                     Opcode::CPFSEQ,
                     Opcode::CPFSGT,
@@ -363,13 +367,13 @@ impl Decodable for Instruction {
                     Opcode::NEGF,
                     Opcode::MOVWF
                 ][opc as usize];
-                self.operands[0] = Operand::File(word[0], a == 1);
+                inst.operands[0] = Operand::File(word[0], a == 1);
                 Some(())
             },
             x if x >= 0b01110000 && x < 0b11000000 => {
                 let a = x & 1;
                 let opc = ((x >> 4) & 0b00001111) - 0b111;
-                self.opcode = [
+                inst.opcode = [
                     Opcode::BTG,
                     Opcode::BSF,
                     Opcode::BCF,
@@ -377,12 +381,12 @@ impl Decodable for Instruction {
                     Opcode::BTFSC
                 ][opc as usize];
                 let bit = (x >> 1) & 0b0000111;
-                self.operands[0] = Operand::File(word[0], a == 1);
-                self.operands[1] = Operand::ImmediateU8(bit);
+                inst.operands[0] = Operand::File(word[0], a == 1);
+                inst.operands[1] = Operand::ImmediateU8(bit);
                 Some(())
             },
             x if x >= 0b11000000 && x < 0b11010000 => {
-                self.opcode = Opcode::MOVFF;
+                inst.opcode = Opcode::MOVFF;
                 let word2: Vec<u8> = bytes_iter.take(2).collect();
                 if word2.len() != 2 {
                     return None;
@@ -393,21 +397,21 @@ impl Decodable for Instruction {
 
                 let src = (word[0] as u16) | ((word[1] as u16 & 0x0f) << 8);
                 let dest = (word2[0] as u16) | ((word2[1] as u16 & 0x0f) << 8);
-                self.operands[0] = Operand::AbsoluteFile(src);
-                self.operands[1] = Operand::AbsoluteFile(dest);
+                inst.operands[0] = Operand::AbsoluteFile(src);
+                inst.operands[1] = Operand::AbsoluteFile(dest);
                 Some(())
             },
             x if x >= 0b11010000 && x < 0b11100000 => {
-                self.opcode = [
+                inst.opcode = [
                     Opcode::BRA,
                     Opcode::RCALL
                 ][((x >> 3) & 1) as usize];
-                self.operands[0] = Operand::ImmediateU32((((x & 0b111) as u32) << 8) | word[0] as u32);
+                inst.operands[0] = Operand::ImmediateU32((((x & 0b111) as u32) << 8) | word[0] as u32);
                 Some(())
             },
             x if x >= 0b11100000 && x < 0b11101000 => {
                 let opc = x & 0b00000111;
-                self.opcode = [
+                inst.opcode = [
                     Opcode::BZ,
                     Opcode::BNZ,
                     Opcode::BC,
@@ -417,7 +421,7 @@ impl Decodable for Instruction {
                     Opcode::BN,
                     Opcode::BNN
                 ][opc as usize];
-                self.operands[0] = Operand::ImmediateU8(word[0]);
+                inst.operands[0] = Operand::ImmediateU8(word[0]);
                 Some(())
             },
             0xee => {
@@ -431,14 +435,14 @@ impl Decodable for Instruction {
                     return None; // invalid instruction
                 }
 
-                self.opcode = Opcode::LFSR;
+                inst.opcode = Opcode::LFSR;
 
                 let f = (f_k_msb >> 4) & 0b0011;
                 let k_msb = f_k_msb & 0b1111;
                 let k_lsb = word2[0];
 
-                self.operands[0] = Operand::FileFSR(f);
-                self.operands[1] = Operand::ImmediateU32(((k_msb as u32) << 8) | (k_lsb as u32));
+                inst.operands[0] = Operand::FileFSR(f);
+                inst.operands[1] = Operand::ImmediateU32(((k_msb as u32) << 8) | (k_lsb as u32));
                 Some(())
             }
             /* ... */
@@ -456,8 +460,8 @@ impl Decodable for Instruction {
 
                 let k_msb = (((word2[1] & 0xf) as u32) << 8) | word2[0] as u32;
 
-                self.opcode = Opcode::CALL;
-                self.operands[0] = Operand::ImmediateU32(((k_msb << 8) | k_lsb as u32) << 1);
+                inst.opcode = Opcode::CALL;
+                inst.operands[0] = Operand::ImmediateU32(((k_msb << 8) | k_lsb as u32) << 1);
                 Some(())
             }
             0xef => {
@@ -473,8 +477,8 @@ impl Decodable for Instruction {
 
                 let k_msb = (((word2[1] & 0xf) as u32) << 8) | word2[0] as u32;
 
-                self.opcode = Opcode::GOTO;
-                self.operands[0] = Operand::ImmediateU32(((k_msb << 8) | k_lsb as u32) << 1);
+                inst.opcode = Opcode::GOTO;
+                inst.operands[0] = Operand::ImmediateU32(((k_msb << 8) | k_lsb as u32) << 1);
                 Some(())
             }
             _ => None
