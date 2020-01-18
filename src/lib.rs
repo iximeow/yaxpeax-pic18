@@ -84,8 +84,8 @@ impl yaxpeax_arch::Instruction for Instruction {
     fn well_defined(&self) -> bool { true }
 }
 
-impl Instruction {
-    pub fn blank() -> Instruction {
+impl Default for Instruction {
+    fn default() -> Instruction {
         Instruction {
             opcode: Opcode::NOP,
             operands: [Operand::Nothing, Operand::Nothing]
@@ -196,10 +196,6 @@ pub struct InstDecoder {}
 impl Decoder<Instruction> for InstDecoder {
     type Error = DecodeError;
 
-    fn decode<T: IntoIterator<Item=u8>>(&self, bytes: T) -> Result<Instruction, Self::Error> {
-        let mut blank = Instruction::blank();
-        self.decode_into(&mut blank, bytes).map(|_: ()| blank)
-    }
     fn decode_into<T: IntoIterator<Item=u8>>(&self, inst: &mut Instruction, bytes: T) -> Result<(), Self::Error> {
         let mut bytes_iter = bytes.into_iter();
         let word: Vec<u8> = bytes_iter.by_ref().take(2).collect();
