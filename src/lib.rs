@@ -9,7 +9,7 @@ use std::fmt;
 
 extern crate yaxpeax_arch;
 
-use yaxpeax_arch::{Arch, Decoder, LengthedInstruction};
+use yaxpeax_arch::{Arch, AddressDiff, Decoder, LengthedInstruction};
 
 pub mod consts;
 pub mod display;
@@ -37,9 +37,9 @@ pub struct Instruction {
 }
 
 impl LengthedInstruction for Instruction {
-    type Unit = <PIC18 as Arch>::Address;
+    type Unit = AddressDiff<<PIC18 as Arch>::Address>;
     fn min_size() -> Self::Unit {
-        2
+        AddressDiff::from_const(2)
     }
     fn len(&self) -> Self::Unit {
         match self.opcode {
@@ -49,9 +49,9 @@ impl LengthedInstruction for Instruction {
                 | Opcode::CALL
                 | Opcode::LFSR
                 | Opcode::GOTO => {
-                4
+                AddressDiff::from_const(4)
             },
-            _ => 2
+            _ => AddressDiff::from_const(2)
         }
     }
 }
