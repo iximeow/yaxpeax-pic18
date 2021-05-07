@@ -128,7 +128,7 @@ impl Display for Operand {
                 } else {
                     write!(f, "[{}]", consts::named_file(
                         if *file < 0x80 {
-                            (*file as u16)
+                            *file as u16
                         } else {
                             (*file as u16) | 0xf00u16
                         })
@@ -150,7 +150,7 @@ impl Display for Operand {
                 } else {
                     write!(f, "[{}]", consts::named_file(
                         if *file < 0x80 {
-                            (*file as u16)
+                            *file as u16
                         } else {
                             (*file as u16) | 0xf00u16
                         })
