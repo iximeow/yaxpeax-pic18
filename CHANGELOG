@@ -2,6 +2,8 @@
 
 update yaxpeax-arch to 0.2.3, fix some API differences
 
+update crate to rust 2018
+
 # 0.0.4
 
 first version with changelog, decoder is complete but untested

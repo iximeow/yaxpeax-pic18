@@ -1,12 +1,3 @@
-#[cfg(feature="use-serde")]
-#[macro_use] extern crate serde_derive;
-#[cfg(feature="use-serde")]
-extern crate serde;
-//#[cfg(feature="use-serde")]
-//use serde::{Serialize, Deserialize};
-
-extern crate yaxpeax_arch;
-
 use yaxpeax_arch::{Arch, AddressDiff, Decoder, LengthedInstruction, Reader, StandardDecodeError};
 
 pub mod consts;

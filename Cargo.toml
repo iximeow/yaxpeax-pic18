@@ -6,6 +6,7 @@ authors = [ "iximeow <me@iximeow.net>" ]
 license = "0BSD"
 repository = "http://git.iximeow.net/yaxpeax-pic18/"
 description = "pic18 decoder for the yaxpeax project"
+edition = "2018"
 
 [dependencies]
 yaxpeax-arch = { version = "0.2.3", default-features = false, features = [] }
