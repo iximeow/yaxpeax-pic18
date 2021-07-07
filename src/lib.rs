@@ -5,27 +5,22 @@ extern crate serde;
 //#[cfg(feature="use-serde")]
 //use serde::{Serialize, Deserialize};
 
-use std::fmt;
-
 extern crate yaxpeax_arch;
 
-use yaxpeax_arch::{Arch, AddressDiff, Decoder, LengthedInstruction};
+use yaxpeax_arch::{Arch, AddressDiff, Decoder, LengthedInstruction, Reader, StandardDecodeError};
 
 pub mod consts;
 pub mod display;
 
-#[cfg(feature="use-serde")]
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PIC18;
-
-#[cfg(not(feature="use-serde"))]
+#[cfg_attr(feature="use-serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct PIC18;
 
 impl Arch for PIC18 {
     type Address = u32;
+    type Word = u8;
     type Instruction = Instruction;
-    type DecodeError = DecodeError;
+    type DecodeError = StandardDecodeError;
     type Decoder = InstDecoder;
     type Operand = Operand;
 }
@@ -54,29 +49,6 @@ impl LengthedInstruction for Instruction {
             _ => AddressDiff::from_const(2)
         }
     }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum DecodeError {
-    ExhaustedInput,
-    InvalidOpcode,
-    InvalidOperand,
-}
-
-impl fmt::Display for DecodeError {
-    fn fmt(&self, f:  &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DecodeError::ExhaustedInput => write!(f, "exhausted input"),
-            DecodeError::InvalidOpcode => write!(f, "invalid opcode"),
-            DecodeError::InvalidOperand => write!(f, "invalid operand"),
-        }
-    }
-}
-
-impl yaxpeax_arch::DecodeError for DecodeError {
-    fn data_exhausted(&self) -> bool { self == &DecodeError::ExhaustedInput }
-    fn bad_opcode(&self) -> bool { self == &DecodeError::InvalidOpcode }
-    fn bad_operand(&self) -> bool { self == &DecodeError::InvalidOperand }
 }
 
 impl yaxpeax_arch::Instruction for Instruction {
@@ -193,15 +165,10 @@ pub enum Operand {
 #[derive(Default, Debug)]
 pub struct InstDecoder {}
 
-impl Decoder<Instruction> for InstDecoder {
-    type Error = DecodeError;
-
-    fn decode_into<T: IntoIterator<Item=u8>>(&self, inst: &mut Instruction, bytes: T) -> Result<(), Self::Error> {
-        let mut bytes_iter = bytes.into_iter();
-        let word: Vec<u8> = bytes_iter.by_ref().take(2).collect();
-        if word.len() != 2 {
-            return Err(DecodeError::ExhaustedInput);
-        }
+impl Decoder<PIC18> for InstDecoder {
+    fn decode_into<T: Reader<<PIC18 as Arch>::Address, <PIC18 as Arch>::Word>>(&self, inst: &mut Instruction, words: &mut T) -> Result<(), <PIC18 as Arch>::DecodeError> {
+        let mut word = [0u8; 2];
+        words.next_n(&mut word)?;
 
 //            println!("Decoding {:x?}", word);
         match word[1] {
@@ -289,7 +256,7 @@ impl Decoder<Instruction> for InstDecoder {
                     },
                     _ => {
                         inst.opcode = Opcode::Invalid(word[0], word[1]);
-                        Err(DecodeError::InvalidOpcode)
+                        Err(StandardDecodeError::InvalidOpcode)
                     }
                 }
             },
@@ -413,12 +380,10 @@ impl Decoder<Instruction> for InstDecoder {
             },
             x if x >= 0b11000000 && x < 0b11010000 => {
                 inst.opcode = Opcode::MOVFF;
-                let word2: Vec<u8> = bytes_iter.take(2).collect();
-                if word2.len() != 2 {
-                    return Err(DecodeError::ExhaustedInput);
-                }
+                let mut word2 = [0u8; 2];
+                words.next_n(&mut word2)?;
                 if word2[1] & 0xf0 != 0xf0 {
-                    return Err(DecodeError::InvalidOperand);
+                    return Err(StandardDecodeError::InvalidOperand);
                 }
 
                 let src = (word[0] as u16) | ((word[1] as u16 & 0x0f) << 8);
@@ -452,13 +417,11 @@ impl Decoder<Instruction> for InstDecoder {
             },
             0xee => {
                 let f_k_msb = word[0];
-                let word2: Vec<u8> = bytes_iter.take(2).collect();
-                if word2.len() != 2 {
-                    return Err(DecodeError::ExhaustedInput);
-                }
+                let mut word2 = [0u8; 2];
+                words.next_n(&mut word2)?;
 
                 if (word2[1] & 0xf0) != 0xf0 {
-                    return Err(DecodeError::InvalidOperand);
+                    return Err(StandardDecodeError::InvalidOperand);
                 }
 
                 inst.opcode = Opcode::LFSR;
@@ -475,13 +438,11 @@ impl Decoder<Instruction> for InstDecoder {
             0xeb | 0xec => {
                 // TODO: respect s bit
                 let k_lsb = word[0];
-                let word2: Vec<u8> = bytes_iter.take(2).collect();
-                if word2.len() != 2 {
-                    return Err(DecodeError::ExhaustedInput);
-                }
+                let mut word2 = [0u8; 2];
+                words.next_n(&mut word2)?;
 
                 if (word2[1] & 0xf0) != 0xf0 {
-                    return Err(DecodeError::InvalidOperand);
+                    return Err(StandardDecodeError::InvalidOperand);
                 }
 
                 let k_msb = (((word2[1] & 0xf) as u32) << 8) | word2[0] as u32;
@@ -492,13 +453,11 @@ impl Decoder<Instruction> for InstDecoder {
             }
             0xef => {
                 let k_lsb = word[0];
-                let word2: Vec<u8> = bytes_iter.take(2).collect();
-                if word2.len() != 2 {
-                    return Err(DecodeError::ExhaustedInput);
-                }
+                let mut word2 = [0u8; 2];
+                words.next_n(&mut word2)?;
 
                 if (word2[1] & 0xf0) != 0xf0 {
-                    return Err(DecodeError::InvalidOperand);
+                    return Err(StandardDecodeError::InvalidOperand);
                 }
 
                 let k_msb = (((word2[1] & 0xf) as u32) << 8) | word2[0] as u32;
@@ -507,7 +466,7 @@ impl Decoder<Instruction> for InstDecoder {
                 inst.operands[0] = Operand::ImmediateU32(((k_msb << 8) | k_lsb as u32) << 1);
                 Ok(())
             }
-            _ => Err(DecodeError::InvalidOpcode)
+            _ => Err(StandardDecodeError::InvalidOpcode)
         }
     }
 }
