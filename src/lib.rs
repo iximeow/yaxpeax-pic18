@@ -1,5 +1,8 @@
 use yaxpeax_arch::{Arch, AddressDiff, Decoder, LengthedInstruction, Reader, StandardDecodeError};
 
+#[cfg(feature="use-serde")]
+#[macro_use] extern crate serde_derive;
+
 pub mod consts;
 pub mod display;
 

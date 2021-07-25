@@ -1,3 +1,7 @@
+# 0.1.1
+
+fix `Serialize` and `Deserialize` macros not being present when `use-serde` feature is selected
+
 # 0.1.0
 
 update yaxpeax-arch to 0.2.3, fix some API differences
